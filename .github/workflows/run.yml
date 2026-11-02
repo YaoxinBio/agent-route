@@ -2,6 +2,11 @@ name: AgentRoute verified rules
 
 on:
   workflow_dispatch:
+    inputs:
+      allow_shrink:
+        description: Publish even if a dataset lost over 30 percent (only after checking upstream)
+        type: boolean
+        default: false
   schedule:
     # Beijing 06:30, matching the upstream schedule.
     - cron: '30 22 * * *'
@@ -41,6 +46,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       manifest_sha256: ${{ steps.dataset.outputs.manifest_sha256 }}
+      stale_upstreams: ${{ steps.dataset.outputs.stale_upstreams }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -49,6 +55,7 @@ jobs:
         id: dataset
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          AGENTROUTE_ALLOW_SHRINK: ${{ inputs.allow_shrink }}
         run: |
           python3 -B scripts/build_rules.py
           echo "manifest_sha256=$(sha256sum generated/manifest.json | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
@@ -122,3 +129,17 @@ jobs:
           git add --all
           git commit --quiet -m 'Publish one validated routing-data generation'
           git push "$remote" HEAD:refs/heads/release --force-with-lease="refs/heads/release:$expected"
+  # The rules are already published. Failing here is the one signal that reaches the
+  # maintainer: GitHub emails about failed runs and the build badge turns red.
+  upstream-freshness:
+    needs: [build, publish]
+    if: needs.build.outputs.stale_upstreams != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Report upstream sources that stopped updating
+        env:
+          STALE_UPSTREAMS: ${{ needs.build.outputs.stale_upstreams }}
+        run: |
+          echo "::error::No new upstream commit in 14 days: $STALE_UPSTREAMS"
+          exit 1
