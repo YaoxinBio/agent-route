@@ -1,0 +1,45 @@
+name: 接入问题反馈
+description: 你的 Agent 按文档接入时遇到的问题。Agent 的报告脱敏后可以直接贴进来。
+title: "[接入反馈] "
+body:
+  - type: markdown
+    attributes:
+      value: 不要提交节点地址、订阅链接、密码、Cookie、完整配置或真实 IP。
+  - type: dropdown
+    id: area
+    attributes:
+      label: 问题出在哪一部分
+      options:
+        - 规则
+        - DNS
+        - WebRTC
+        - 接入流程或文档
+        - 模板
+        - 其他
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 系统、客户端和真实核心版本
+      placeholder: 例如 macOS 26 / FlClash 0.8 / Mihomo 1.19
+    validations:
+      required: true
+  - type: input
+    id: scope
+    attributes:
+      label: 接入范围和文档版本
+      placeholder: 例如 电脑客户端 / 文档提交 SHA 前 7 位
+  - type: textarea
+    id: problem
+    attributes:
+      label: Agent 卡在哪一步，看到了什么
+      description: 写清实际现象，以及文档里哪句话不够用或说不通。
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: 脱敏后的报告
+      description: 可选。提交前再检查一遍有没有地址、令牌和密码。
+      render: text
