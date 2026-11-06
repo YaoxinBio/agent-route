@@ -3,6 +3,7 @@ import ipaddress
 import json
 import os
 from pathlib import Path
+import re
 import unittest
 
 import yaml
@@ -280,6 +281,24 @@ class AgentGuidanceTests(unittest.TestCase):
         report = report[report.index('简短交付格式'):]
         for phrase in ('后续更新', '文档提交 SHA', '接入范围'):
             self.assertIn(phrase, report)
+
+    def test_acceptance_standard_keeps_every_item_and_its_evidence_rule(self):
+        # The acceptance section is the one place that decides a result. An item that loses
+        # its evidence requirement lets a configuration screenshot pass as a verified path.
+        text = (ROOT / 'docs/DNS-WEBRTC.md').read_text(encoding='utf-8')
+        section = text[text.index('<a id="acceptance"></a>'):text.index('<a id="report"></a>')]
+        names = re.findall(r'^\*\*(.+?)\*\*$', section, re.M)
+        blocks = re.split(r'^\*\*.+?\*\*$', section, flags=re.M)[1:]
+        for required in ('TUN 与模式', '规则来源与刷新', '规则加载与分流', '用户例外优先', '核心自有地址',
+                         '实际可用性', 'DNS', 'WebRTC', 'IPv6', '持久化', '恢复方法'):
+            self.assertIn(required, names)
+        self.assertEqual(len(names), len(blocks))
+        for name, block in zip(names, blocks):
+            with self.subTest(item=name):
+                for label in ('通过：', '需要：', '不能单独证明：'):
+                    self.assertRegex(block, r'(?m)^- ' + label + r'\S')
+        for kind in ('**配置**', '**加载**', '**运行**', '**外部**'):
+            self.assertIn(kind, section)
 
     def test_issue_form_is_well_formed_and_warns_about_secrets(self):
         form = yaml.safe_load((ROOT / '.github/ISSUE_TEMPLATE/agent-report.yml').read_text(encoding='utf-8'))
