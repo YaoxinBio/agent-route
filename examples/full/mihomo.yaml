@@ -53,16 +53,15 @@ dns:
   proxy-server-nameserver:
     - https://223.5.5.5/dns-query#DIRECT
     - https://223.6.6.6/dns-query#DIRECT
-  # Keeps the per-domain resolver on the second lookup made by a DIRECT connection.
-  direct-nameserver:
-    - https://223.5.5.5/dns-query#DIRECT
-    - https://223.6.6.6/dns-query#DIRECT
-  direct-nameserver-follow-policy: true
+  # Keep domain-based DNS policy even when China-IP fallback routes the connection DIRECT.
+  # Explicitly clear a separately configured direct resolver when merging this example.
+  direct-nameserver: []
   nameserver:
     - https://1.1.1.1/dns-query#PROXY
     - https://1.0.0.1/dns-query#PROXY
   nameserver-policy:
-    # "system" follows the OS resolver, which a client may rewrite to a public address.
+    # "system" is a reference, not proof of a local path: verify this core's actual
+    # upstream separately from the application-side OS resolver. Replace if needed.
     rule-set:sr-private: [system]
     rule-set:sr-proxy:
       - https://1.1.1.1/dns-query#PROXY
