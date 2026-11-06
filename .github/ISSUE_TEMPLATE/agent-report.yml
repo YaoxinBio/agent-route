@@ -29,7 +29,7 @@ body:
     id: scope
     attributes:
       label: 接入范围和文档版本
-      placeholder: 例如 电脑客户端 / 文档提交 SHA 前 7 位
+      placeholder: 例如 电脑客户端 / 文档完整提交 SHA（无法取得时注明未核实）
   - type: textarea
     id: problem
     attributes:
