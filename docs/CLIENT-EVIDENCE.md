@@ -38,3 +38,11 @@
 ### 应用接管不等于核心内网解析已核实
 
 [#12 的补充反馈](https://github.com/ryuu-restart/agent-route/issues/12#issuecomment-6679926933)提供了一个案例：普通应用查询被接管，但核心的 `system` 另有读取来源。已核对该报告对应的 [Mihomo 读取代码](https://github.com/MetaCubeX/mihomo/blob/88dcbf7f1614a67c3b36b848ee3592dfa92ada36/dns/system_posix.go#L13)及 [UDP 客户端构造](https://github.com/MetaCubeX/mihomo/blob/88dcbf7f1614a67c3b36b848ee3592dfa92ada36/dns/system_common.go#L15)，以及 [GUI 设置占位地址的条件](https://github.com/clash-verge-rev/clash-verge-rev/blob/4337bd85758d54d7b9044b2da3c9ac1176eae1f3/src-tauri/src/utils/resolve/dns.rs#L13)。这支持“分别核对应用侧与核心侧实际路径”的通用检查要求；报告者的设备与网络观察未由本项目独立复现，不提供关闭客户端开关或改系统 DNS 的通用处方。
+
+## 运行时加载与持久化的区别
+
+2026-11 的 [#19](https://github.com/ryuu-restart/agent-route/issues/19)记录 Windows 11、Clash Verge Rev 2.5.10、Mihomo v1.19.33 的单机观察：从用户工作目录按 path 重载被安全路径检查拒绝，payload 重载成功并加载规则，但这不证明管理服务保存的运行副本同步更新。报告者通过管理程序重新生成后使改动进入托管配置；本项目未独立复现其目录权限、重启或恢复行为。
+
+该版 Mihomo 的 [重载实现](https://github.com/MetaCubeX/mihomo/blob/v1.19.33/hub/route/configs.go#L405)区分 path 与 payload：显式路径须通过[安全路径检查](https://github.com/MetaCubeX/mihomo/blob/v1.19.33/constant/path.go#L87)，payload 解析后应用到核心。Clash Verge Rev 的[配置应用流程](https://github.com/clash-verge-rev/clash-verge-rev/blob/c83f7ad529c7c9cb3d2d54a0955ef8c1b22a411b/src-tauri/src/core/manager/config.rs#L386)则通过当前配置管理者处理服务暂存与重载。核对结果支持“核心当前加载与管理者持久保存分别验收”，不把某个 GUI 按钮、目录或权限修改推广为通用要求。
+
+同环境的 [#11 补充](https://github.com/ryuu-restart/agent-route/issues/11#issuecomment-6681228500)报告通过脚本合并保留用户例外、五类规则资源加载及配置检查成功。这些是报告者的单机证据，不代表所有规则实际命中、DNS/WebRTC 路径或持久化已通过，也不要求其他 Agent 复刻该脚本。
