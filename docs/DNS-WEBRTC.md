@@ -16,18 +16,17 @@
 
 核对首选、备用及并发解析器、系统解析器、浏览器安全 DNS 和 IPv6；解析失败不静默退回直连或明文路径。DoH 加密不证明查询经过代理，DNS 分流也不能仅看配置里的解析器名称或 IP 归属地。
 
+**DNS 路径按域名类别决定，不由业务连接的最终出站反推。** 首次解析、缓存未命中、重试、回退和连接建立时的再次解析都须保持该类别的目标。例如未知域名解析后因中国 IP 兜底而业务直连，其后续 DNS 仍须经代理加密；不能因为业务选择了 DIRECT 就另换直连解析器。具体字段和实现由执行 Agent 按现场能力选择。
+
 <a id="private-dns-preflight"></a>
 
 ### 内网解析判断
 
 应用前查清 system/local、回环 stub 的实际上游。客户端可能在运行时改写系统 DNS，要对照系统当前 DNS 与可取得的 DHCP 下发值，按实际联网接口区分物理网卡和 TUN 网卡，不固定接口名或虚拟 DNS 地址。路由器之后的转发设备看不到，不要求追查，在报告里注明即可。
 
-| 系统 | 只读检查与边界 |
-| --- | --- |
-| macOS | `scutil --dns` 查看当前解析器；`ipconfig getpacket <实际接口>` 查看该接口的 DHCPv4 数据。将占位符换成当前物理接口，不假定是 `en0`；无 DHCP 租约时不能据此取得下发值，IPv6 另查 |
-| Windows | [Get-DnsClientServerAddress](https://learn.microsoft.com/en-us/powershell/module/dnsclient/get-dnsclientserveraddress) 查看各接口的 IPv4 / IPv6 DNS，物理与 TUN 接口都要辨认；`netsh interface ipv4 show dnsservers` 辅助查看接口 DNS 配置（[说明](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/netsh-interface)） |
-| Windows IPv4 来源线索 | 注册表 `HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{GUID}` 的 `NameServer` / `DhcpNameServer` 仅作静态配置与 DHCP 来源线索，先对应当前接口；可能缺失或残留，不能判断由谁修改，也不能证明当前查询路径 |
-| Windows 系统 DoH | [Get-DnsClientDohServerAddress](https://learn.microsoft.com/en-us/powershell/module/dnsclient/get-dnsclientdohserveraddress) 查看已知服务器的 DoH 配置，核对 `AutoUpgrade`、`AllowFallbackToUdp` 与当前实际使用的解析器；列出服务器不代表正在使用 DoH，也不代表浏览器独立安全 DNS 或查询出站已验证 |
+分别核对**普通应用的系统查询路径**和**代理核心内部解析器的下一跳**。系统显示的地址可能只是被接管的占位地址；普通查询得到 FakeIP 只能证明该样本被接管。系统列表出现公网地址、DHCP 下发内网地址、普通查询已被接管，均不能单独证明核心处理 private 时的上游；`system/local` 也不保证导入系统的逐域或 mDNS 策略。实际内网名称只在用户认可且已核实的内网解析路径上测试，不能先向未确认的上游发送名称来探路。无法确定时记未验证。
+
+可按需参考[系统检查入口示例](CLIENT-EVIDENCE.md#系统-dns-的只读入口示例)；它们不替代上述路径判断。
 
 这些结果用于辨认配置来源，仍须结合日志与实际查询核实路径。命令不可用、DHCP 值缺失或证据不足时，相应项记未验证，不据此判通过。
 
@@ -96,7 +95,7 @@ DNS 与 WebRTC 互不替代：一项通过不证明另一项通过。修复若�
 | TUN 与模式 | 运行状态、路由和目标应用证明实际接管，规则模式有效；系统代理请求不替代此项。按[接入范围](CLIENTS.md#scope)不适用时写明理由 |
 | 规则加载与分流 | 完整接入五类资源真实加载且不为空，代表样本命中预期规则；受限接入分别列实际资源、主配置行为和缺失项 |
 | 实际可用性 | 改前改后比较国内、海外 HTTPS 及适用内网服务，没有本次引入的解析、连接或 TLS 故障；只看命中不够 |
-| DNS | 各查询类别、备用路径和浏览器解析符合上方目标，有实际解析器及出站证据 |
+| DNS | 各查询类别、备用路径和浏览器解析符合目标；核对连接建立时是否再次解析。未知域名经中国 IP 兜底直连时，DNS 仍保持原类别的代理路径；单地址与混合地址证据分开记录 |
 | WebRTC | 按上方判断表确认路径，分别记录配置档、策略与音视频功能结果 |
 | IPv6 | 分别验证代理出口能力和设备目标流量接管；通过 HTTP 代理的 curl -6 成功不能单独证明二者 |
 | 持久化 | 适用时刷新订阅；获准后重启客户端、浏览器并复查相关配置。没做就明确未验证，不适用须说明理由 |

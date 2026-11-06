@@ -107,6 +107,15 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(dns_rules[evaluate + 3]['server'], 'dns-fake')
         self.assertEqual(config['dns']['rules'][1], {'rule_set': ['sr-private'], 'server': 'dns-local'})
 
+    def test_mihomo_dns_policy_is_independent_of_business_outbound(self):
+        dns = yaml.safe_load((FULL / 'mihomo.yaml').read_text(encoding='utf-8'))['dns']
+        # A domain absent from all domain lists may route DIRECT after China-IP
+        # lookup. Its later DNS lookups must keep the same default resolver.
+        direct = dns.get('direct-nameserver')
+        self.assertEqual(direct or dns['nameserver'], dns['nameserver'])
+        if direct:
+            self.assertTrue(dns.get('direct-nameserver-follow-policy'))
+
 
 class AgentGuidanceTests(unittest.TestCase):
     def test_update_reminder_survives_in_prompt_flow_and_report(self):

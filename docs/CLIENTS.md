@@ -55,27 +55,19 @@ private 为通用内网域名；direct 只含域名，cn-ip 只含公网中国 I
 
 <a id="pitfalls"></a>
 
-## 已知易错点
+## 通用检查点
 
-只收官方写明或真实踩过的坑，用来提醒该查什么，不是配置教程；字段仍以实际版本为准。发现新的坑请[反馈](https://github.com/ryuu-restart/agent-route/issues/new/choose)。
+以下要求不绑定客户端、版本或某个字段。执行 Agent 根据现场能力决定如何实现和取证；发现项目准则或示例有矛盾时按[反馈流程](../AGENTS.md#issue-feedback)处理。
 
-| 范围 | 易错点 | 依据 |
-| --- | --- | --- |
-| Surge | 加密 DNS 默认直连，不经过规则。开启 `encrypted-dns-follow-outbound-mode` 后，命中的节点地址如果是域名，这条连接仍回退直连 | [手册](https://manual.nssurge.com/dns/encrypted-dns.html) |
-| Surge | 模块里的规则只能用 DIRECT、REJECT 等内置策略，代理规则放不进去 | [手册](https://manual.nssurge.com/profile/module.html) |
-| Mihomo | `respect-rules` 要配 `proxy-server-nameserver`，否则节点解析可能依赖节点自身。设置 `direct-nameserver` 后，直连的二次解析默认不遵循 `nameserver-policy`，内网名可能被发给它 | [文档](https://wiki.metacubex.one/config/dns/) |
-| Clash Verge Rev | v2.5.5 起，扩展配置只替换 `dns` 下写出的子字段，未写的保留；写出 `nameserver-policy` 会替换整个策略表，不逐条合并。`ipv6`、`tun.enable` 等设置页接管的字段会在末尾回写 | [文档](https://www.clashverge.dev/guide/extend.html)、[v2.5.10 合并代码](https://github.com/clash-verge-rev/clash-verge-rev/blob/c83f7ad529c7c9cb3d2d54a0955ef8c1b22a411b/src-tauri/src/enhance/merge.rs#L19) |
-| Clash Verge Rev | v2.5.10 先处理规则编辑器，再执行全局扩展和订阅扩展；后续脚本直接 prepend 托管块，会把它放到编辑器中的用户例外前。可在同一“编辑规则”入口按“用户例外 → 托管规则”排列 prepend，再核对后续扩展及最终生成配置 | 2026-11 核对 [v2.5.10 执行顺序](https://github.com/clash-verge-rev/clash-verge-rev/blob/c83f7ad529c7c9cb3d2d54a0955ef8c1b22a411b/src-tauri/src/enhance/mod.rs#L916) |
-| Clash Verge Rev | v2.5.10 开启 DNS 覆写时，实际接管的 DNS 字段和 hosts 会在扩展之后恢复。2026-11-06 官方网页对此与该版本源码描述不同，不能只凭“扩展后执行”认定能覆盖设置；按实际版本核对最终配置 | [v2.5.10 回写代码与测试](https://github.com/clash-verge-rev/clash-verge-rev/blob/c83f7ad529c7c9cb3d2d54a0955ef8c1b22a411b/src-tauri/src/enhance/mod.rs#L1439)，未经本项目实机验证 |
-| Clash Verge Rev | v2.5.7 优先读取当前订阅 UID 对应的 `profile_dns_settings`，没有该项才回退到 `enable_dns_settings`。不能只看旧全局字段判断 DNS 覆写是否生效；核对当前订阅的实际开关及最终生成配置，不默认关闭覆写 | [v2.5.7 源码](https://github.com/clash-verge-rev/clash-verge-rev/blob/ea509b82363a40c3c32e951d7ce9d66d66da411f/src-tauri/src/config/dns.rs#L116)；2026-11 [用户实机补充](https://github.com/ryuu-restart/agent-route/issues/11#issuecomment-6678341203)，仅限所述环境，未独立复现 |
-| FlClash | “DNS覆写”“追加系统DNS”会改变订阅里的 DNS 策略 | 2026-10 实测，[代码](https://github.com/chen08209/FlClash/blob/main/lib/common/task.dart) |
-| FlClash | “自动设置系统DNS”把 `223.5.5.5` 写进系统设置。网络的 DNS 来自 DHCP 时，系统里就只剩这个公网地址，Mihomo 的 `system` 随之指向公网，内网名会发给它 | 2026-11 本机核对，[代码](https://github.com/chen08209/FlClash/blob/v0.9.2/lib/common/system_dns.dart) |
-| FlClash | “查找进程”关闭时 `find-process-mode` 为 off，会覆盖订阅里的值，PROCESS 规则不生效 | 2026-11 本机核对 |
-| sing-box | 路由规则不会替域名解析（除非用 `resolve`），直接传入 SOCKS / HTTP 的未知域名走默认出站。没有 `sniff` 时，只有 IP 的流量匹配不到域名规则 | [文档](https://sing-box.sagernet.org/configuration/route/rule_action/)，2026-10 隔离实测 |
-| FakeIP | 常用的 FakeIP IPv6 段在 `fc00::/7` 内，这条 LAN 规则排在前面时，FakeIP 流量可能被当成内网直连 | [项目模板](../examples/full/mihomo.yaml)的规则顺序和测试 |
-| Shadowrocket | 普通 DoH 地址不经过节点，要加 `#proxy`。`proxy-dns-server` 只解析节点域名。`[Host]` 没写能引用规则集，内网域名要逐条加 | [社区手册](https://github.com/LOWERTOP/Shadowrocket)（非官方，未经真机验证），2026-10 用户反馈 |
-| Chrome / Chromium | 策略为 `disable_non_proxied_udp` 时 ICE 候选可能为 0，这不证明安全。TUN 下不装扩展，srflx 也可能已是节点出口 | 2026-11 对照：无扩展临时配置档与原配置档比较 |
-| 广告名单 | 会拦一些遥测和功能开关域名，如 `statsig.anthropic.com`、`featuregates.org`。AI 工具行为异常时先查这里，实际影响未实测 | 2026-11 名单抽查 |
+| 检查点 | 必须保持的准则 |
+| --- | --- |
+| 用户例外与规则顺序 | 在最终生效配置中验证优先级；中间编辑器、扩展或模块的保存顺序不能代替最终规则顺序 |
+| 配置来源与持久化 | 区分原始配置、覆写、当前配置档和运行配置；按实际版本核实谁拥有最终值，订阅刷新后仍须成立 |
+| DNS 全阶段路径 | 首次、备用和再次解析都遵守域名类别目标；业务直连不自动授权 DNS 直连，本地解析标签不证明实际上游 |
+| 域名与合成地址 | 已知域名应按域名规则判断；裸 IP、嗅探和 FakeIP 是不同证据，合成地址不能命中真实 LAN 或中国 IP 兜底 |
+| 证据与能力边界 | 单字段、单次探针、语法检查或另一设备的成功都不代表目标设备通过；不能保持目标时报告限制并由使用者选择 |
+
+具体版本的来源、已知案例和系统命令保存在[可选证据](CLIENT-EVIDENCE.md)。按需查证，不把案例当作通用操作步骤。
 
 <a id="config-check"></a>
 
