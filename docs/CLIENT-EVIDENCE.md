@@ -19,7 +19,8 @@
 | FlClash | “自动设置系统DNS”把 `223.5.5.5` 写进系统设置。网络的 DNS 来自 DHCP 时，系统里就只剩这个公网地址，Mihomo 的 `system` 随之指向公网，内网名会发给它 | 2026-11 本机核对，[代码](https://github.com/chen08209/FlClash/blob/v0.9.2/lib/common/system_dns.dart) |
 | FlClash | “查找进程”关闭时 `find-process-mode` 为 off，会覆盖订阅里的值，PROCESS 规则不生效 | 2026-11 本机核对 |
 | sing-box | 路由规则不会替域名解析（除非用 `resolve`），直接传入 SOCKS / HTTP 的未知域名走默认出站。没有 `sniff` 时，只有 IP 的流量匹配不到域名规则 | [文档](https://sing-box.sagernet.org/configuration/route/rule_action/)，2026-10 隔离实测 |
-| FakeIP | 常用的 FakeIP IPv6 段在 `fc00::/7` 内，这条 LAN 规则排在前面时，FakeIP 流量可能被当成内网直连 | [项目模板](../examples/full/mihomo.yaml)的规则顺序和测试 |
+| sing-box | v1.14.4 中，出站的 `domain_resolver` 或 `route.default_domain_resolver` 指定了服务器时，域名直接交给该服务器解析，不经过 `dns.rules`；以域名形式到达的业务直连目标和节点服务器域名都按此解析。route 的 `resolve` 动作不指定 `server` 时按 DNS 规则解析，出站随后直接拨号解析结果 | 2026-11-06 源码核对：[解析器选择](https://github.com/SagerNet/sing-box/blob/v1.14.4/common/dialer/dialer.go#L104)、[指定服务器即直查](https://github.com/SagerNet/sing-box/blob/v1.14.4/dns/router.go#L1290)、[resolve 动作](https://github.com/SagerNet/sing-box/blob/v1.14.4/route/route.go#L924)、[使用解析结果拨号](https://github.com/SagerNet/sing-box/blob/v1.14.4/route/conn.go#L108)；未实机复现 |
+| FakeIP / TUN 地址 | 常用的 FakeIP IPv6 段在 `fc00::/7` 内，这条 LAN 规则排在前面时，FakeIP 流量可能被当成内网直连。Mihomo v1.19.32 的 TUN IPv4 地址取自 `fake-ip-range`，IPv6 默认 `fdfe:dcba:9876::1/126` 不在常用 FakeIP 段内，却同样在 `fc00::/7` 内 | [项目模板](../examples/full/mihomo.yaml)与测试；[IPv6 默认值](https://github.com/MetaCubeX/mihomo/blob/v1.19.32/config/config.go#L551)、[IPv4 取值](https://github.com/MetaCubeX/mihomo/blob/v1.19.32/config/config.go#L1687)；[#22](https://github.com/ryuu-restart/agent-route/issues/22) 报告 Clash Party 2.0.4 / macOS 下因此反复出现回环拒绝，属报告者观察，未独立复现 |
 | Shadowrocket | 普通 DoH 地址不经过节点，要加 `#proxy`。`proxy-dns-server` 只解析节点域名。`[Host]` 没写能引用规则集，内网域名要逐条加 | [社区手册](https://github.com/LOWERTOP/Shadowrocket)（非官方，未经真机验证），2026-10 用户反馈 |
 | Chrome / Chromium | 策略为 `disable_non_proxied_udp` 时 ICE 候选可能为 0，这不证明安全。TUN 下不装扩展，srflx 也可能已是节点出口 | 2026-11 对照：无扩展临时配置档与原配置档比较 |
 | 广告名单 | 会拦一些遥测和功能开关域名，如 `statsig.anthropic.com`、`featuregates.org`。AI 工具行为异常时先查这里，实际影响未实测 | 2026-11 名单抽查 |
@@ -46,3 +47,5 @@
 该版 Mihomo 的 [重载实现](https://github.com/MetaCubeX/mihomo/blob/v1.19.33/hub/route/configs.go#L405)区分 path 与 payload：显式路径须通过[安全路径检查](https://github.com/MetaCubeX/mihomo/blob/v1.19.33/constant/path.go#L87)，payload 解析后应用到核心。Clash Verge Rev 的[配置应用流程](https://github.com/clash-verge-rev/clash-verge-rev/blob/c83f7ad529c7c9cb3d2d54a0955ef8c1b22a411b/src-tauri/src/core/manager/config.rs#L386)则通过当前配置管理者处理服务暂存与重载。核对结果支持“核心当前加载与管理者持久保存分别验收”，不把某个 GUI 按钮、目录或权限修改推广为通用要求。
 
 同环境的 [#11 补充](https://github.com/ryuu-restart/agent-route/issues/11#issuecomment-6681228500)报告通过脚本合并保留用户例外、五类规则资源加载及配置检查成功。这些是报告者的单机证据，不代表所有规则实际命中、DNS/WebRTC 路径或持久化已通过，也不要求其他 Agent 复刻该脚本。
+
+2026-11 的 [#21](https://github.com/ryuu-restart/agent-route/issues/21)记录 Windows 11、Hiddify 4.1.1（hiddify-core 4.1.0、sing-box 1.13.1）的单机观察：每次连接时主配置被整体重写，用客户端自带生成命令处理订阅原文后，只剩生成器自带的少量路由和固定 DNS 服务器，订阅里的规则与 DNS 均未保留；自带的 parse 输出也只含 outbounds。报告者对照的是 PR #18、#20 之前的文档版本，本项目未独立复现。它说明的通用要求是：持久化位置以重新生成后的运行配置为准，检查工具的结论只覆盖它实际读取的段落。
